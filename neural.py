@@ -46,10 +46,9 @@ class Neural:
     def read_file(self, path, sepa=','):
         try:
             self.df = pd.read_csv(path, sep=sepa, header=None)
-            # self.df.fillna(0)
+            self.df.fillna(0)
 
             for data_column in self.df:
-
                 # self.labels[data_column]
                 contain_str = False
                 for index in range(len(self.df[data_column])):
@@ -81,8 +80,6 @@ class Neural:
         self.output_data = np.array(self.df)
         self.output_data = np.delete(self.output_data, np.s_[0:self.input_features], axis=1)  # usuwam dane wejsciowe
 
-
-
         if verbose:
             print("Dane wejściowe:\n" + str(self.input_data))
             print("Dane wyjściowe:\n" + str(self.output_data))
@@ -107,19 +104,6 @@ class Neural:
         if len(self.df) < 1:
             return False
         return True
-
-    def on_epoch_end(self):
-        epoch = self.network.last_epoch
-        errors = self.network.validation_errors
-
-        print(epoch)
-        if errors.previous() and errors.last() > errors.previous():
-            # Load parameters and stop training
-
-            raise StopTraining("Training has been interrupted")
-        else:
-            pass
-            # Save parameters after successful epoch
 
     def select_algorithm(self, algorithm):
         self.network = algorithms.LevenbergMarquardt(self.layers)
