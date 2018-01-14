@@ -1,0 +1,92 @@
+class NeuralManager():
+	input_features = 1
+	output_classes = 1
+
+	input_data = None
+	output_data = None
+
+	input_train = None
+	output_train = None
+	input_test = None
+	output_test = None
+
+	network = None
+
+	df = None
+
+	def __init__(self):
+		pass
+
+	def set_columns_split(self, inpu, output):
+		self.input_features = inpu
+		self.output_classes = output
+
+	def read_file(self, path, sepa=','):
+		self.df = pd.read_csv(path, sep=sepa, header=None)
+	#
+
+	def prepare_data(self, verbose=False):
+		if self.df is None:
+			raise Exception("Nie załadowano pliku")
+
+		self.input_data = np.array(self.df)
+		# input_train = np.delete(input_train, np.s_[x_c - 1], axis=1) # usuwam kolumnę Y
+		self.input_data = np.delete(self.input_data, np.s_[self.input_features:self.input_features + self.output_classes], axis=1)  # usuwam kol wyjsciowe
+
+		self.output_data = np.array(self.df)
+		self.output_data = np.delete(self.output_data, np.s_[0:self.input_features], axis=1)  # usuwam dane wejsciowe
+
+		if verbose:
+			print(self.output_data)
+			print(self.input_data)
+
+	def split_data(self, percent):
+		if self.df is None:
+			raise Exception("Nie załadowano pliku")
+
+		split_at = len(self.df) * (percent * 0.01)
+		split_at = round(split_at, 0)
+		print("Podział na: " + str(split_at))
+		self.input_train = self.input_data[:int(split_at - 1)]
+		self.output_train = self.output_data[:int(split_at - 1)]
+
+		self.input_test = self.input_data[int(split_at):]
+		self.output_test = self.output_data[int(split_at):]
+
+	# print(y_train)
+
+	def model_network(self, algorithm, model):
+
+		self.network = algorithms.LevenbergMarquardt(
+			[
+				layers.Input(self.input_features),
+				layers.Linear(15),
+				layers.Linear(10),
+				layers.Relu(self.output_classes)
+			],
+			#None
+			# (x_c, 15, 5, y_c)
+			# (layers.Input(x_c) > layers.Linear(5) > layers.Linear(8)  > layers.Relu(y_c))
+		)
+
+	def train_network(self, verbose=False, shuffle=True, validate=True, plot=False, epo=30):
+
+		self.network.verbose = verbose
+		self.network.shuffle_data = shuffle
+
+		if validate:
+			self.network.train(self.input_train, self.output_train, self.input_test, self.output_test, epochs=epo)
+		else:
+			self.network.train(self.input_train, self.output_train, epochs=epo)
+
+		if plot:
+			plots.error_plot(self.network)
+
+	def predict(self, data):
+
+		input_test = np.array([[6.2, 2.8, 4.8, 1.8],
+		                       [5.0, 3.5, 1.6, 3.1]])
+
+		y_class = self.network.predict(input_test)
+		print(y_class)
+		return y_class
