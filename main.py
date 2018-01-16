@@ -125,7 +125,6 @@ class GUI:
 			self.file_info.set(
 				'Załadowano rekordów: ' + str(len(self.neural.df)) + ', kolumn: ' + str(len(self.neural.df.columns)))
 			self.input_columns.set(len(self.neural.df.columns) - 1)
-			self.output_columns.set(1)
 
 	def optimalizerCallback(self):
 		self.selected_optimalizer = self.optimalizers_combobox.get()
@@ -158,15 +157,15 @@ class GUI:
 				msg_box.showerror("Informacja", "Nie wybrano pliku z danymi")
 				return
 
-			try:
-				if self.output_columns.get() != self.raw_model[-1][1].get():
-					# self.raw_model[-1][2].set(self.output_columns.get())
-					msg_box.showwarning("Informacja", "Niepoprawny model (war. wyjściowa, modyfikuję)" + str(self.raw_model[-1][1].get()))
-					self.raw_model[-1][1].set(self.output_columns.get())
-					return
-			except IndexError:
-				msg_box.showerror("Błąd", "Niepoprawny model sieci!")
-				return
+			# try:
+			# 	if self.output_columns.get() != self.raw_model[-1][1].get():
+			# 		# self.raw_model[-1][2].set(self.output_columns.get())
+			# 		msg_box.showwarning("Informacja", "Niepoprawny model (war. wyjściowa, modyfikuję)" + str(self.raw_model[-1][1].get()))
+			# 		self.raw_model[-1][1].set(self.output_columns.get())
+			# 		return
+			# except IndexError:
+			# 	msg_box.showerror("Błąd", "Niepoprawny model sieci!")
+			# 	return
 
 			self.neural.split_data(self.splitdata_spinbox_textvariable.get())
 
@@ -179,8 +178,8 @@ class GUI:
 				self.neural.train_network(verbose=self.verbose.get(), shuffle=self.shuffle_data.get(),
 											validate=self.validate.get(),
 											epo=self.epochs.get())
-			except ValueError:
-				msg_box.showerror("Błąd uczenia sieci", "Przerwano uczenie sieci")
+			except ValueError as e:
+				msg_box.showerror("Błąd uczenia sieci", "Przerwano uczenie sieci" + str(e))
 				return
 
 			if self.plot.get():
@@ -235,10 +234,12 @@ class GUI:
 			data = self.test_string.get()
 			data_list = []
 			predicted_val = None
+			test_val = self.neural.output_test
+			stacked = []
+
 			if data != '':
 				print("a: " + data)
 				try:
-					# FIX
 					data_list = self.csv_line_to_list(data)
 				except IndexError:
 					msg_box.showerror("Błąd dekompozycji danych", "Niepoprawne dane")
@@ -252,7 +253,7 @@ class GUI:
 				print("c: " + str(predicted_val))
 			else:
 				predicted_val = self.neural.predict(data=self.neural.input_test)
-				predicted_val = np.hstack((self.neural.output_test, np.asarray(predicted_val)))
+				stacked = np.hstack((test_val, np.asarray(predicted_val)))
 
 			print("Zakończono klasyfikację")
 
@@ -263,7 +264,7 @@ class GUI:
 
 			top.protocol("WM_DELETE_WINDOW", callback)
 			var = StringVar()
-			label = Label(top, textvariable=var, relief=FLAT).pack(side=TOP)
+			Label(top, textvariable=var, relief=FLAT).pack(side=TOP)
 			var.set("Wynik klasyfikacji danych testowych:")
 
 			text = Text(top)
@@ -273,45 +274,69 @@ class GUI:
 			text.tag_configure('bad', background='red')
 
 			labels = self.neural.labels
-			if data == '':
-				text.insert(END, '        Etykieta rekordu,      sklasyfikowano jako,     wartość,      błąd \n')
-			for element in predicted_val:
+
+			for lab in labels[-1]:
+				text.insert(END, ' {:>12},'.format(str(lab)))
+			for lab in labels[-1]:
+				text.insert(END, ' {:>12},'.format(str(lab)))
+			text.insert(END, '  Klasa wyjściowa\n')
+			element_index = 0
+
+			for element in stacked:
+				label_predicted = 'Błąd'
 
 				if data == '':
-					if len(labels) != 0:
+					# if len(labels) != 0:
+					#
+					# 	label_predicted = 'Błąd'
+					# 	label_real = 'Błąd'
+					# 	for label in labels:
+					# 		for name, dict_ in label.items():
+					# 			if float("%.f" % element[1]) == dict_:
+					# 				label_predicted = name
+					# 			if element[0] == dict_:
+					# 				label_real = name
+					# else:
+					# 	pass
 
-						label_predicted = 'Błąd'
-						label_real = 'Błąd'
-						for label in labels:
-							for name, dict_ in label.items():
-								if float("%.f" % element[1]) == dict_:
-									label_predicted = name
-								if element[0] == dict_:
-									label_real = name
-					else:
-						label_predicted = element[1]
-						label_real = element[0]
+					test_hightest_index = 0
+					predicted_hightest_index = 0
 
-					error = element[0] - element[1]
-					if (error > -0.5) and (error < 0.5):
+					for i in range(len(test_val[element_index])):
+						if test_val[element_index][i] > test_hightest_index:
+							test_hightest_index = i
+
+					for index in range(len(predicted_val[element_index])):
+						if predicted_val[element_index][index] >= predicted_val[element_index][predicted_hightest_index]:
+							predicted_hightest_index = index
+
+					print(labels[-1])
+					for name, dict_ in labels[-1].items():
+						if predicted_hightest_index + 1 == dict_:
+							label_predicted = name
+
+					color = 'bad'
+					if predicted_hightest_index == test_hightest_index:
 						color = 'good'
-					else:
-						color = 'bad'
 
-					text.insert(END, '{:>24}, {:>24}, {:>11}, {:>17} \n'.format(str(label_real),
-									label_predicted, "%.5f" % element[1], "%.2f" % error), color)
+					for list_element in range(len(element)):
+						text.insert(END, ' {:>12},'.format("%.3f" % element[list_element]), color)
+
+					text.insert(END, ' Wyście: {} \n'.format(str(label_predicted)), color)
+
+					element_index += 1
 				else:
-
-					label_predicted = 'Błąd'
-					if len(labels) != 0:
-						for label in labels:
-								for name, dict_ in label.items():
-									if float("%.f" % element[0]) == dict_:
-										label_predicted = name
-
-						text.insert(END, 'Wartość: {}, klasa {}'.format("%.2f" % element[0], label_predicted))
-					else:
-						text.insert(END, 'Wartość: {}'.format("%.2f" % element[0]))
+					pass
+					# label_predicted = 'Błąd'
+					# if len(labels) != 0:
+					# 	for label in labels:
+					# 			for name, dict_ in label.items():
+					# 				if float("%.f" % element[0]) == dict_:
+					# 					label_predicted = name
+					#
+					# 	text.insert(END, 'Wartość: {}, klasa {}'.format("%.2f" % element[0], label_predicted))
+					# else:
+					# 	text.insert(END, 'Wartość: {}'.format("%.2f" % element[0]))
 
 			top.minsize(800, 600)
 			top.title = 'Wyniki klasyfikacji'
@@ -330,8 +355,6 @@ class GUI:
 		reader = csv.reader(f, delimiter=',')
 
 		for row in reader:
-			print("ROW: " + str(row))
-
 			labels = self.neural.labels
 			if len(labels) != 0:
 				for r_index in range(len(row)):
@@ -349,20 +372,18 @@ class GUI:
 
 		return output
 
-	def update_output_spinbox(self):
-
-		if self.neural.is_file_loaded():
-			if self.output_columns.get() >= len(self.neural.df.columns):
-				self.output_columns.set(len(self.neural.df.columns) - 1)
-			else:
-				self.input_columns.set(len(self.neural.df.columns) - self.output_columns.get())
+	# def update_output_spinbox(self):
+	#
+	# 	if self.neural.is_file_loaded():
+	# 		if self.output_columns.get() >= len(self.neural.df.columns):
+	# 			self.output_columns.set(len(self.neural.df.columns) - 1)
+	# 		else:
+	# 			self.input_columns.set(len(self.neural.df.columns) - self.output_columns.get())
 
 	def update_input_spinbox(self):
 		if self.neural.is_file_loaded():
 			if self.input_columns.get() == len(self.neural.df.columns):
 				self.input_columns.set(len(self.neural.df.columns) - 1)
-			else:
-				self.output_columns.set(len(self.neural.df.columns) - self.input_columns.get())
 
 	def validate_val(self, default, min_, max_, var):
 		# return false if ALL OKAY
@@ -398,11 +419,7 @@ class GUI:
 		self.splitdata_spinbox_textvariable.set("80")
 		splitdata_label = Label(data_frame, text='Procent danych uczących', relief=FLAT).pack(side=RIGHT)
 
-		output_columns_label = Label(data_frame, text="Ilość wyjść", relief=FLAT).pack(side=BOTTOM)
-		output_columns_spinbox = Spinbox(data_frame, from_=1, to=10000, width=10, activebackground='white',
-											state='readonly', command=self.update_output_spinbox,
-											textvariable=self.output_columns)
-		output_columns_spinbox.pack(side=BOTTOM, pady=self.padding_val, padx=self.padding_val)
+		#output_columns_label = Label(data_frame, text="Ilość wyjść", relief=FLAT, textvariable=self.output_columns).pack(side=BOTTOM)
 
 		input_columns_label = Label(data_frame, text="Ilość wejść", relief=FLAT).pack(side=BOTTOM)
 		input_columns_spinbox = Spinbox(data_frame, from_=1, to=10000, width=10, textvariable=self.input_columns,
