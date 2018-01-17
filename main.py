@@ -67,7 +67,7 @@ class GUI:
 		layer_frame = LabelFrame(self.layers_frame.interior, relief=FLAT)
 		layer_frame.pack(fill="both", expand="no", side=TOP)
 
-		neuron_count_label = Label(layer_frame, text='Ilość neuronów: ').pack(side=LEFT)
+		Label(layer_frame, text='Ilość neuronów: ').pack(side=LEFT)
 
 		neuron_count_var = IntVar()
 		neuron_count_spinbox = Spinbox(layer_frame, from_=1, to=10000, width=6,
@@ -84,9 +84,8 @@ class GUI:
 		activation_function_combobox.pack(pady=self.padding_val, padx=self.padding_val, side=LEFT)
 
 		index = self.layers_continous_count
-		remove_layer_btn = Button(layer_frame, text="Usuń warstwę",
-									command=lambda: remove_layer(index)).pack(side=LEFT, pady=self.padding_val,
-																				padx=self.padding_val)
+		Button(layer_frame, text="Usuń warstwę", command=lambda: remove_layer(index)).pack(side=LEFT,
+														pady=self.padding_val, padx=self.padding_val)
 
 		neuron_count_var.set(self.validate_val(self.output_columns.get(), 1, 10000, neuron_count_var)[0])
 		layer_data = [self.layers_continous_count, neuron_count_var, activation_fuction]
@@ -100,8 +99,7 @@ class GUI:
 			for layer in self.raw_model:
 				if int(layer[0]) == int(layer_id):
 					print("USUWAM index:{0} ID={1}, Neurons={2}, Activation={3}".format(str(ind), str(layer[0]),
-							str(layer[1]),
-							str(layer[2].get())))
+							str(layer[1]), str(layer[2].get())))
 					self.raw_model.pop(ind)
 					layer_frame.destroy()
 					self.layers_count -= 1
@@ -156,16 +154,6 @@ class GUI:
 			except IOError:
 				msg_box.showerror("Informacja", "Nie wybrano pliku z danymi")
 				return
-
-			# try:
-			# 	if self.output_columns.get() != self.raw_model[-1][1].get():
-			# 		# self.raw_model[-1][2].set(self.output_columns.get())
-			# 		msg_box.showwarning("Informacja", "Niepoprawny model (war. wyjściowa, modyfikuję)" + str(self.raw_model[-1][1].get()))
-			# 		self.raw_model[-1][1].set(self.output_columns.get())
-			# 		return
-			# except IndexError:
-			# 	msg_box.showerror("Błąd", "Niepoprawny model sieci!")
-			# 	return
 
 			self.neural.split_data(self.splitdata_spinbox_textvariable.get())
 
@@ -236,7 +224,7 @@ class GUI:
 			predicted_val = None
 			test_val = self.neural.output_test
 			stacked = []
-
+			input_selected = None
 			if data != '':
 				print("a: " + data)
 				try:
@@ -245,15 +233,19 @@ class GUI:
 					msg_box.showerror("Błąd dekompozycji danych", "Niepoprawne dane")
 					return
 				print("b: " + str(data_list))
-				try:
-					predicted_val = self.neural.predict(data=data_list)
-				except Exception as e:
-					msg_box.showerror("Błąd podczas klasyfikacji danych", "Niepoprawne dane wejściowe")
-					return
-				print("c: " + str(predicted_val))
+				input_selected = np.array([data_list])
+				# input_selected = data_list
 			else:
-				predicted_val = self.neural.predict(data=self.neural.input_test)
-				stacked = np.hstack((test_val, np.asarray(predicted_val)))
+				input_selected = self.neural.input_test
+
+			print(input_selected)
+
+			try:
+				predicted_val = self.neural.predict(data=input_selected)
+				# stacked = np.hstack((test_val, np.asarray(predicted_val)))
+			except Exception:
+				msg_box.showerror("Błąd podczas klasyfikacji danych", "Niepoprawne dane wejściowe")
+				return
 
 			print("Zakończono klasyfikację")
 
@@ -277,28 +269,14 @@ class GUI:
 
 			for lab in labels[-1]:
 				text.insert(END, ' {:>12},'.format(str(lab)))
-			for lab in labels[-1]:
-				text.insert(END, ' {:>12},'.format(str(lab)))
+
 			text.insert(END, '  Klasa wyjściowa\n')
 			element_index = 0
 
-			for element in stacked:
+			for element in predicted_val:
 				label_predicted = 'Błąd'
-
+				label_real = 'Błąd'
 				if data == '':
-					# if len(labels) != 0:
-					#
-					# 	label_predicted = 'Błąd'
-					# 	label_real = 'Błąd'
-					# 	for label in labels:
-					# 		for name, dict_ in label.items():
-					# 			if float("%.f" % element[1]) == dict_:
-					# 				label_predicted = name
-					# 			if element[0] == dict_:
-					# 				label_real = name
-					# else:
-					# 	pass
-
 					test_hightest_index = 0
 					predicted_hightest_index = 0
 
@@ -310,10 +288,13 @@ class GUI:
 						if predicted_val[element_index][index] >= predicted_val[element_index][predicted_hightest_index]:
 							predicted_hightest_index = index
 
-					print(labels[-1])
 					for name, dict_ in labels[-1].items():
 						if predicted_hightest_index + 1 == dict_:
 							label_predicted = name
+
+					for name, dict_ in labels[-1].items():
+						if test_hightest_index + 1 == dict_:
+							label_real = name
 
 					color = 'bad'
 					if predicted_hightest_index == test_hightest_index:
@@ -322,21 +303,27 @@ class GUI:
 					for list_element in range(len(element)):
 						text.insert(END, ' {:>12},'.format("%.3f" % element[list_element]), color)
 
-					text.insert(END, ' Wyście: {} \n'.format(str(label_predicted)), color)
+					text.insert(END, ' Sklasyfikowano jako: {:>12}, wartość rzecz. {:>12} \n'
+													.format(str(label_predicted), str(label_real)), color)
 
 					element_index += 1
 				else:
-					pass
-					# label_predicted = 'Błąd'
-					# if len(labels) != 0:
-					# 	for label in labels:
-					# 			for name, dict_ in label.items():
-					# 				if float("%.f" % element[0]) == dict_:
-					# 					label_predicted = name
-					#
-					# 	text.insert(END, 'Wartość: {}, klasa {}'.format("%.2f" % element[0], label_predicted))
-					# else:
-					# 	text.insert(END, 'Wartość: {}'.format("%.2f" % element[0]))
+					print(predicted_val[0])
+
+					for list_element in range(len(predicted_val[0])):
+						print("%.3f" % predicted_val[0][list_element])
+						text.insert(END, ' {:>12},'.format("%.3f" % predicted_val[0][list_element]))
+
+					predicted_hightest_index = 0
+					for index in range(len(predicted_val[0])):
+						if predicted_val[0][index] >= predicted_val[0][predicted_hightest_index]:
+							predicted_hightest_index = index
+
+					for name, dict_ in labels[-1].items():
+						if predicted_hightest_index + 1 == dict_:
+							label_predicted = name
+
+					text.insert(END, ' Sklasyfikowano jako: {:>12}\n'.format(str(label_predicted)))
 
 			top.minsize(800, 600)
 			top.title = 'Wyniki klasyfikacji'
@@ -356,29 +343,21 @@ class GUI:
 
 		for row in reader:
 			labels = self.neural.labels
-			if len(labels) != 0:
-				for r_index in range(len(row)):
-					for index in range(len(row)):
-						# if labels[index] in
-						if r_index == index:
-							for name, dict_ in labels[index].items():
-								if str(name) == row[r_index]:
-									output.append(dict_)
-									print("Feature" + str(r_index) + " N: " + str(name) + " D: " + str(dict_))
-							# for label in labels:
-							# 	for name, dict_ in label.items():
-			else:
-				output.append(row)
+
+			converted = []
+			for idx, val in enumerate(row):
+				for name, dict_ in labels[idx].items():
+					# TODO
+					print(str(name) + " " + str(val) + " " + str(dict_))
+					if name == val:
+						converted.append(dict_)
+						print(dict_)
+						break
+			print(converted)
+			output = list(converted)
+			# output.append(row)
 
 		return output
-
-	# def update_output_spinbox(self):
-	#
-	# 	if self.neural.is_file_loaded():
-	# 		if self.output_columns.get() >= len(self.neural.df.columns):
-	# 			self.output_columns.set(len(self.neural.df.columns) - 1)
-	# 		else:
-	# 			self.input_columns.set(len(self.neural.df.columns) - self.output_columns.get())
 
 	def update_input_spinbox(self):
 		if self.neural.is_file_loaded():
@@ -497,7 +476,7 @@ class GUI:
 	def start_gui(self):
 		self.add_LayerCallBack()
 		self.top.title("Klasyfikator")
-		self.top.minsize(950, 650)
+		self.top.minsize(950, 600)
 		self.top.maxsize(800, 400)
 		self.top.mainloop()
 

@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 from neupy import algorithms, layers, plots
-from neupy.exceptions import StopTraining
-import neupy.algorithms.summary_info as summary
 import pandas as pd
+from sklearn import preprocessing
 
 
 # noinspection PyTypeChecker
@@ -45,23 +44,36 @@ class Neural:
 
 	def read_file(self, path, sepa=','):
 		try:
-			self.df = pd.read_csv(path, sep=sepa, header=None)
+			self.df = pd.read_csv(path, sep=sepa, header=None, skipinitialspace=True)
 			self.df.fillna(0)
 
 			for data_column in self.df:
-				# self.labels[data_column]
-				contain_str = False
-				for index in range(len(self.df[data_column])):
-					val = self.df[data_column].iloc[index]
-					if not self.isNumber(val):
-						contain_str = True
-						break
+				contain_str = True  # TRUE - wszystkie kolumny beda  etykietami
+				if not contain_str:
+					for index in range(len(self.df[data_column])):
+						val = self.df[data_column].iloc[index]
+						if not self.isNumber(val):
+							contain_str = True
+							break
 				if contain_str:
 					unique_gat = self.df[data_column].unique()
 					unique_gat_ind = []
 					for ind in range(len(unique_gat)):
 						unique_gat_ind.append(ind+1)
 					x = dict(zip(unique_gat, unique_gat_ind))
+					# print(unique_gat)
+					# # FIX
+					# gats = []
+					# for gat in unique_gat:
+					# 	print(gat)
+					# 	gats.append(gat)
+					#
+					# print(gats)
+					# unique_gat = np.array(unique_gat)
+					# # x = dict(zip(gats, unique_gat_ind))
+					#
+					# stacked = np.hstack((gats, unique_gat_ind))
+					# x = dict(np.array(stacked))
 					self.df[data_column] = self.df[data_column].map(x)
 					self.labels.append(x)
 					print('Etykiety dla kolumny: {0} {1}'.format(str(data_column + 1), str(x)))
@@ -81,7 +93,16 @@ class Neural:
 		self.output_data = np.array(self.df)
 		self.output_data = np.delete(self.output_data, np.s_[0:self.input_features], axis=1)  # usuwam dane wejsciowe
 
-		output_df = pd.DataFrame(self.output_data)
+		# konwersja na klasy
+		self.output_data = self.convert_to_classes(self.output_data)
+		#self.input_data = self.normalize_data(self.input_data)
+
+		if verbose:
+			print("Dane wejściowe:\n" + str(self.input_data))
+			print("Dane wyjściowe:\n" + str(self.output_data))
+
+	def convert_to_classes(self, data):
+		output_df = pd.DataFrame(data)
 		unique_output = output_df[0].unique()
 		empty_list = []
 
@@ -97,11 +118,21 @@ class Neural:
 					new_output.append(label)
 
 		self.output_classes = len(unique_output)
-		self.output_data = np.array(new_output)
+		return np.array(new_output)
+
+
+	def normalize_data(self, data, verbose=False):
+		# normalizacja
+		input_for_norm = pd.DataFrame(data)
+		input_ = input_for_norm.values  # returns a numpy array
+		min_max_scaler = preprocessing.MinMaxScaler()
+		x_scaled = min_max_scaler.fit_transform(input_)
+		out_ = pd.DataFrame(x_scaled)
+		normalized = np.array(out_)
 
 		if verbose:
-			print("Dane wejściowe:\n" + str(self.input_data))
-			print("Dane wyjściowe:\n" + str(self.output_data))
+			print(normalized)
+		return normalized
 
 	def split_data(self, percent):
 		if self.df is None:
@@ -205,17 +236,17 @@ class Neural:
 
 		if self.network is None:
 			print("Sieć nie została utworzona")
-			#raise ValueError("Sieć nie została utworzona")
+			# raise ValueError("Sieć nie została utworzona")
 		self.network.verbose = verbose
 		self.network.shuffle_data = shuffle
 
 		if self.input_train is None or self.output_train is None:
 			print("Nie zainicjowano danych uczących")
-			#raise ValueError("Nie zainicjowano danych uczących")
+			# raise ValueError("Nie zainicjowano danych uczących")
 		if validate:
 			if self.input_test is None or self.output_test is None:
 				print("Nie zainicjowano danych walidujących")
-				#raise ValueError("Nie zainicjowano danych walidujących")
+				# raise ValueError("Nie zainicjowano danych walidujących")
 			self.network.train(self.input_train, self.output_train, self.input_test, self.output_test, epochs=epo)
 			# self.network.architecture()
 		else:

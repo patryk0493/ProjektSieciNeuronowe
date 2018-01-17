@@ -4,3 +4,5 @@ wyswitlanie od razu klasy wyjciowej
 # zamiana danych na wiersz zmapowany
 
 traktowanie klas jako wyjściowych jako etykiety
+
+mapowanie minmax także danych wejściowych do klasyfikacji
