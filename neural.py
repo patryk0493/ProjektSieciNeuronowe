@@ -47,7 +47,7 @@ class Neural:
 			self.df = pd.read_csv(path, sep=sepa, header=None, skipinitialspace=True)
 			self.df.fillna(0)
 
-			for data_column in self.df:
+			for idx, data_column in enumerate(self.df):
 				contain_str = True  # TRUE - wszystkie kolumny beda  etykietami
 				if not contain_str:
 					for index in range(len(self.df[data_column])):

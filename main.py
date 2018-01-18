@@ -339,24 +339,17 @@ class GUI:
 			from io import StringIO
 		output = []
 		f = StringIO(line)
-		reader = csv.reader(f, delimiter=',')
+		reader = csv.reader(f, delimiter=',', skipinitialspace=True)
 
 		for row in reader:
 			labels = self.neural.labels
-
 			converted = []
 			for idx, val in enumerate(row):
 				for name, dict_ in labels[idx].items():
-					# TODO
-					print(str(name) + " " + str(val) + " " + str(dict_))
-					if name == val:
+					if str(name) == val:
 						converted.append(dict_)
-						print(dict_)
 						break
-			print(converted)
 			output = list(converted)
-			# output.append(row)
-
 		return output
 
 	def update_input_spinbox(self):
