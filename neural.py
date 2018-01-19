@@ -45,10 +45,10 @@ class Neural:
 	def read_file(self, path, sepa=','):
 		try:
 			self.df = pd.read_csv(path, sep=sepa, header=None, skipinitialspace=True)
-			self.df.fillna(0)
+			self.df.fillna(method='bfill', inplace=True)
 
 			for idx, data_column in enumerate(self.df):
-				contain_str = True  # TRUE - wszystkie kolumny beda  etykietami
+				contain_str = False  # TRUE - wszystkie kolumny beda  etykietami
 				if not contain_str:
 					for index in range(len(self.df[data_column])):
 						val = self.df[data_column].iloc[index]
@@ -61,23 +61,25 @@ class Neural:
 					for ind in range(len(unique_gat)):
 						unique_gat_ind.append(ind+1)
 					x = dict(zip(unique_gat, unique_gat_ind))
-					# print(unique_gat)
-					# # FIX
-					# gats = []
-					# for gat in unique_gat:
-					# 	print(gat)
-					# 	gats.append(gat)
-					#
-					# print(gats)
-					# unique_gat = np.array(unique_gat)
-					# # x = dict(zip(gats, unique_gat_ind))
-					#
-					# stacked = np.hstack((gats, unique_gat_ind))
-					# x = dict(np.array(stacked))
 					self.df[data_column] = self.df[data_column].map(x)
 					self.labels.append(x)
 					print('Etykiety dla kolumny: {0} {1}'.format(str(data_column + 1), str(x)))
+				else:
+					self.labels.append(None)
+					print('Brak etykiety dla kolumny: {0}'.format(str(data_column + 1)))
 
+			# ostatnia kolumna koniecznie jako etykieta
+			last_col_index = max(self.df.columns)
+			if self.labels[last_col_index] is None:
+				self.labels.pop()
+				unique_gat = self.df[last_col_index].unique()
+				unique_gat_ind = []
+				for ind in range(len(unique_gat)):
+					unique_gat_ind.append(ind + 1)
+				x = dict(zip(unique_gat, unique_gat_ind))
+				self.df[last_col_index] = self.df[last_col_index].map(x)
+				self.labels.append(x)
+				print('Etykiety dla kolumny: {0} {1}'.format(str(last_col_index + 1), str(x)))
 
 		except BaseException:
 			raise IOError("Nie wczytano pliku")

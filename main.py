@@ -341,14 +341,17 @@ class GUI:
 		f = StringIO(line)
 		reader = csv.reader(f, delimiter=',', skipinitialspace=True)
 
-		for row in reader:
+		for idy, row in enumerate(reader):
 			labels = self.neural.labels
 			converted = []
 			for idx, val in enumerate(row):
-				for name, dict_ in labels[idx].items():
-					if str(name) == val:
-						converted.append(dict_)
-						break
+				if labels[idx] is not None:
+					for name, dict_ in labels[idx].items():
+						if str(name) == val:
+							converted.append(dict_)
+							break
+				else:
+					converted.append(val)
 			output = list(converted)
 		return output
 
