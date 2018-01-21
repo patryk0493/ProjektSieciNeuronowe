@@ -6,9 +6,6 @@ from tkinter import ttk
 from neural import Neural
 from VerticalScrolledFrame import VerticalScrolledFrame
 import numpy as np
-import pandas as pd
-# from StringIO import StringIO  # Python2
-from io import StringIO  # Python3
 import csv
 
 
@@ -26,9 +23,13 @@ class GUI:
 	epochs = IntVar()
 	validate = BooleanVar()
 	plot = BooleanVar()
+	mu = StringVar()
+	mu_update = StringVar()
 	test_string = StringVar()
 	file_info = StringVar()
-	optimalizers = ['LevenbergMarquardt', 'GradientDescent', 'Adam', 'QuasiNewton', 'Quickprop']
+	optimalizers = ['LevenbergMarquardt', 'GradientDescent', 'Adam', 'QuasiNewton', 'Quickprop',
+					'MinibatchGradientDescent', 'ConjugateGradient', 'Hessian', 'HessianDiagonal',
+					'Momentum', 'RPROP', 'IRPROPPlus', 'Adadelta', 'Adagrad', 'RMSProp', 'Adamax']
 	activation_function_list = ('Linear', 'Sigmoid', 'HardSigmoid', 'Step',
 		'Tanh', 'Relu', 'Softplus', 'Softmax', 'Elu', 'PRelu', 'LeakyRelu')
 
@@ -39,6 +40,7 @@ class GUI:
 	network_frame = None
 	layers_frame = None
 	optimalizers_combobox = None
+	optimalizer_opt_frame = None
 
 	neural = Neural()
 
@@ -57,10 +59,9 @@ class GUI:
 		self.validate.set(1)
 		self.plot.set(0)
 		self.test_string.set('')
+		self.mu.set(0.1)
+		self.mu_update.set(1.2)
 		self.file_info.set('Brak informacji o pliku')
-
-	def showTestClassificationCallback(self):
-		pass
 
 	def add_LayerCallBack(self):
 
@@ -126,6 +127,10 @@ class GUI:
 
 	def optimalizerCallback(self):
 		self.selected_optimalizer = self.optimalizers_combobox.get()
+		if self.selected_optimalizer == 'LevenbergMarquardt':
+			self.optimalizer_opt_frame.pack(side=TOP, pady=self.padding_val, padx=self.padding_val)
+		else:
+			self.optimalizer_opt_frame.pack_forget()
 		print("Optymalizer: " + self.selected_optimalizer)
 
 	def reset_LayerCallBack(self):
@@ -141,10 +146,24 @@ class GUI:
 			result = self.validate_val(default=80, min_=1, max_=100, var=self.splitdata_spinbox_textvariable)
 			if result[1]:  # invalid value
 				msg_box.showinfo("Informacja", "Niewłaściwa wartość podziału danych, ustawiam: " + str(result[0]))
+				self.epochs.set(result[0])
 
 			result = self.validate_val(default=10, min_=1, max_=100000, var=self.epochs)
 			if result[1]:  # invalid value
 				msg_box.showinfo("Informacja", "Niewłaściwa wartość liczby epok, ustawiam: " + str(result[0]))
+				self.epochs.set(result[0])
+
+			result = self.is_digit(self.mu.get())
+			if not result:
+				msg_box.showinfo("Informacja", "Niewłaściwa wartość współczynnika µ, przerywam i ustawiam: 0.1")
+				self.mu.set("0.1")
+				return
+
+			result = self.is_digit(self.mu_update.get())
+			if not result:
+				msg_box.showinfo("Informacja", "Niewłaściwa wartość współczynnika β, przerywam i  ustawiam: 1.2")
+				self.mu_update.set("1.2")
+				return
 
 			self.neural.set_columns_split(self.input_columns.get(), self.output_columns.get())
 			print(str("Inputs: " + str(self.input_columns.get()) + ", Outputs: " + str(self.output_columns.get())))
@@ -158,12 +177,13 @@ class GUI:
 			self.neural.split_data(self.splitdata_spinbox_textvariable.get())
 
 			try:
-				self.neural.model_network(algorithm=self.selected_optimalizer, model=self.raw_model)
+				options_ = [float(self.mu.get()), float(self.mu_update.get())]
+				self.neural.model_network(algorithm=self.selected_optimalizer, model=self.raw_model, opt=options_)
 			except ValueError:
 				msg_box.showerror(title="Błąd", message="Nie udało się nauczyć sieci!")
 				return
 			try:
-				self.neural.train_network(verbose=self.verbose.get(), shuffle=self.shuffle_data.get(),
+				self.neural.train_network(verbose=True, shuffle=self.shuffle_data.get(),
 											validate=self.validate.get(),
 											epo=self.epochs.get())
 			except ValueError as e:
@@ -171,7 +191,10 @@ class GUI:
 				return
 
 			if self.plot.get():
-				self.neural.show_plow()
+				try:
+					self.neural.show_plow()
+				except AttributeError:
+					msg_box.showerror("Błąd", "Nie udało się zaprezentowac wykresu precesu uczenia ")
 
 			if self.verbose.get():
 				top = Toplevel()
@@ -179,9 +202,12 @@ class GUI:
 				def callback():
 					top.destroy()
 
+				close_window = Button(top, text="Zamknij okno", command=callback)
+				close_window.pack(side=BOTTOM, pady=self.padding_val, padx=self.padding_val)
+
 				top.protocol("WM_DELETE_WINDOW", callback)
 				var = StringVar()
-				label = Label(top, textvariable=var, relief=FLAT).pack(side=TOP)
+				Label(top, textvariable=var, relief=FLAT).pack(side=TOP)
 				var.set("Wynik uczenia sieci:")
 
 				text = Text(top)
@@ -224,7 +250,6 @@ class GUI:
 			predicted_val = None
 			test_val = self.neural.output_test
 			stacked = []
-			input_selected = None
 			if data != '':
 				print("a: " + data)
 				try:
@@ -238,7 +263,7 @@ class GUI:
 			else:
 				input_selected = self.neural.input_test
 
-			print(input_selected)
+			#print(input_selected)
 
 			try:
 				predicted_val = self.neural.predict(data=input_selected)
@@ -254,10 +279,12 @@ class GUI:
 			def callback():
 				top.destroy()
 
+			close_window = Button(top, text="Zamknij okno", command=callback)
+			close_window.pack(side=BOTTOM, pady=self.padding_val, padx=self.padding_val)
+
 			top.protocol("WM_DELETE_WINDOW", callback)
 			var = StringVar()
 			Label(top, textvariable=var, relief=FLAT).pack(side=TOP)
-			var.set("Wynik klasyfikacji danych testowych:")
 
 			text = Text(top)
 			text.pack(side=TOP, pady=self.padding_val, padx=self.padding_val, fill="both", expand="yes")
@@ -272,8 +299,10 @@ class GUI:
 
 			text.insert(END, '  Klasa wyjściowa\n')
 			element_index = 0
+			well_classed = 0
 
 			for element in predicted_val:
+				var.set("Wynik klasyfikacji dla danych testowych")
 				label_predicted = 'Błąd'
 				label_real = 'Błąd'
 				if data == '':
@@ -299,6 +328,7 @@ class GUI:
 					color = 'bad'
 					if predicted_hightest_index == test_hightest_index:
 						color = 'good'
+						well_classed += 1
 
 					for list_element in range(len(element)):
 						text.insert(END, ' {:>12},'.format("%.3f" % element[list_element]), color)
@@ -308,11 +338,12 @@ class GUI:
 
 					element_index += 1
 				else:
+					var.set("Wynik klasyfikacji dla zadanej próbki" + str(predicted_val[0]))
 					print(predicted_val[0])
 
 					for list_element in range(len(predicted_val[0])):
 						print("%.3f" % predicted_val[0][list_element])
-						text.insert(END, ' {:>12},'.format("%.3f" % predicted_val[0][list_element]))
+						text.insert(END, ' {:>12},'.format("%.5f" % predicted_val[0][list_element]))
 
 					predicted_hightest_index = 0
 					for index in range(len(predicted_val[0])):
@@ -324,6 +355,11 @@ class GUI:
 							label_predicted = name
 
 					text.insert(END, ' Sklasyfikowano jako: {:>12}\n'.format(str(label_predicted)))
+
+			if len(predicted_val) > 1:
+				percent = (well_classed / len(predicted_val)) * 100
+				Label(top, text="Poprawnie klasyfikowano {} ({}%) z {} ".format(str(well_classed), str("%.2f" % percent), str(len(predicted_val))),
+						relief=FLAT).pack(side=RIGHT)
 
 			top.minsize(800, 600)
 			top.title = 'Wyniki klasyfikacji'
@@ -360,25 +396,39 @@ class GUI:
 			if self.input_columns.get() == len(self.neural.df.columns):
 				self.input_columns.set(len(self.neural.df.columns) - 1)
 
+	def is_digit(self, x):
+		try:
+			float(x)
+			return True
+		except ValueError:
+			return False
+
 	def validate_val(self, default, min_, max_, var):
 		# return false if ALL OKAY
 		try:
 			var = var.get()
-			if str(var).isdigit():
+			if self.is_digit(var):
 				if (var < min_) or (var > max_):
 					print('Wartość poza zakresem')
 					var.set(default)
 					return [var, True]
 				else:
+					print('Wartość jest okej')
 					return [var, False]
 			else:
 				print('Wartość nie jest cyfrą, zwracam: ' + default.__str__())
 				var.set(default)
 				return [var, True]
 		except Exception:
-			var.set(default)
-			print('Wyjątek niewłaściwa wartość, zwracam: ' + default.__str__())
-			return [var, True]
+			try:
+				var = default
+				print('Wyjątek niewłaściwa wartość, zwracam: ' + default.__str__())
+				var.set(default)
+				return [var, True]
+			except AttributeError:
+				print('Wyjątek niewłaściwa wartość, zwracam: ' + var.__str__())
+				return [var, True]
+
 
 	def createGUI(self):
 
@@ -392,15 +442,13 @@ class GUI:
 		splitdata_spinbox = Spinbox(data_frame, from_=0, to=100, width=4, textvariable=self.splitdata_spinbox_textvariable)
 		splitdata_spinbox.pack(side=RIGHT, pady=self.padding_val, padx=self.padding_val)
 		self.splitdata_spinbox_textvariable.set("80")
-		splitdata_label = Label(data_frame, text='Procent danych uczących', relief=FLAT).pack(side=RIGHT)
+		Label(data_frame, text='Procent danych uczących', relief=FLAT).pack(side=RIGHT)
 
-		#output_columns_label = Label(data_frame, text="Ilość wyjść", relief=FLAT, textvariable=self.output_columns).pack(side=BOTTOM)
-
-		input_columns_label = Label(data_frame, text="Ilość wejść", relief=FLAT).pack(side=BOTTOM)
+		Label(data_frame, text="Ilość wejść", relief=FLAT).pack(side=BOTTOM)
 		input_columns_spinbox = Spinbox(data_frame, from_=1, to=10000, width=10, textvariable=self.input_columns,
 										state='readonly', command=self.update_input_spinbox)
 		input_columns_spinbox.pack(side=BOTTOM, pady=self.padding_val, padx=self.padding_val)
-		fileinfo_label = Label(data_frame, textvariable=self.file_info, relief=FLAT).pack(side=TOP)
+		Label(data_frame, textvariable=self.file_info, relief=FLAT).pack(side=TOP)
 
 		# === MODEL FRAME ===
 		model_frame = LabelFrame(self.top, text="Modelowanie sieci")
@@ -416,17 +464,28 @@ class GUI:
 		self.optimalizers_combobox.pack(pady=self.padding_val, padx=self.padding_val)
 		self.optimalizers_combobox.bind("<<ComboboxSelected>>", lambda x: self.optimalizerCallback())
 
-		options_frame = LabelFrame(model_frame, text="Opcje symulacji")
+		self.optimalizer_opt_frame = LabelFrame(optimalizer_frame)
+		self.optimalizer_opt_frame.pack(expand="yes", fill='both', pady=self.padding_val, padx=self.padding_val, side=LEFT)
+
+		Label(self.optimalizer_opt_frame, text="Czynnik - µ", relief=FLAT).pack(side=TOP)
+		mu_entry = ttk.Entry(self.optimalizer_opt_frame, textvariable=self.mu)
+		mu_entry.pack(side=TOP, pady=self.padding_val, padx=self.padding_val)
+
+		Label(self.optimalizer_opt_frame, text="Czynnik regularyzacyjny - β", relief=FLAT).pack(side=TOP)
+		mu_update_entry = ttk.Entry(self.optimalizer_opt_frame, textvariable=self.mu_update)
+		mu_update_entry.pack(side=TOP, pady=self.padding_val, padx=self.padding_val)
+
+		options_frame = LabelFrame(model_frame, text="Opcje uczenia")
 		options_frame.pack(expand="no", fill='y', pady=self.padding_val, padx=self.padding_val, side=LEFT)
 		epochs_label = Label(options_frame, text="Liczba epok:", relief=FLAT).pack()
 		self.epochs.set(10)
-		epochs_spinbox = Spinbox(options_frame, from_=1, to=10000, width=6, textvariable=self.epochs).pack(
+		Spinbox(options_frame, from_=1, to=10000, width=6, textvariable=self.epochs).pack(
 			pady=self.padding_val,
 			padx=self.padding_val)
 		shuffle_data_checkbox = Checkbutton(options_frame, text="Mieszanie danych", variable=self.shuffle_data,
 											onvalue=1, offvalue=0)
 		shuffle_data_checkbox.pack(pady=self.padding_val, padx=self.padding_val)
-		verbose_checkbox = Checkbutton(options_frame, text="Pokaż szczegóły", variable=self.verbose, onvalue=1,
+		Checkbutton(options_frame, text="Pokaż szczegóły", variable=self.verbose, onvalue=1,
 										offvalue=0).pack(pady=self.padding_val, padx=self.padding_val)
 
 		# === Network FRAME ===
@@ -444,11 +503,11 @@ class GUI:
 		simulation_frame = LabelFrame(self.top, text="Uczenie sieci")
 		simulation_frame.pack(fill="both", expand="no", pady=self.padding_val, padx=self.padding_val)
 
-		validate_checkbox = Checkbutton(simulation_frame, text="Ucz. z danymi walidującymi", variable=self.validate,
+		Checkbutton(simulation_frame, text="Ucz. z danymi walidującymi", variable=self.validate,
 										onvalue=1, offvalue=0).pack(pady=self.padding_val, padx=self.padding_val,
 										side=LEFT)
 
-		plot_checkbox = Checkbutton(simulation_frame, text="Pokaż wykres [OSTROŻNIE!!!}", variable=self.plot, onvalue=1,
+		Checkbutton(simulation_frame, text="Pokaż wykres [OSTROŻNIE!!!]", variable=self.plot, onvalue=1,
 									offvalue=0).pack(pady=self.padding_val, padx=self.padding_val, side=LEFT)
 
 		start_learn_button = Button(simulation_frame, text="Rozpocznij uczenie sieci", command=self.startLearnCallback)
@@ -460,14 +519,11 @@ class GUI:
 
 		# L1 = Label(test_frame, text="hjkhjk").pack()
 
-		test_label = Label(test_frame, text="Podaj dane do klasyfikacji", relief=FLAT).pack(side=LEFT)
+		Label(test_frame, text="Podaj dane do klasyfikacji", relief=FLAT).pack(side=LEFT)
 
 		self.test_entry = ttk.Entry(test_frame, textvariable=self.test_string).pack(side=LEFT)
 		start_test_button = Button(test_frame, text="Rozpocznij klasyfikację", command=self.startClassificationCallback)
 		start_test_button.pack(side=LEFT, pady=self.padding_val, padx=self.padding_val)
-
-		show_test_button = Button(test_frame, text="Wyniki klasyfikacji", command=self.showTestClassificationCallback)
-		show_test_button.pack(side=RIGHT, pady=self.padding_val, padx=self.padding_val)
 
 	def start_gui(self):
 		self.add_LayerCallBack()

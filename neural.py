@@ -3,14 +3,13 @@ import numpy as np
 from neupy import algorithms, layers, plots
 import pandas as pd
 from sklearn import preprocessing
+from sklearn.utils import shuffle
 
 
 # noinspection PyTypeChecker
 class Neural:
 	input_features = 1
 	output_classes = 1
-
-	labels = []
 
 	input_data = None
 	output_data = None
@@ -22,6 +21,7 @@ class Neural:
 
 	network = None
 	layers = []
+	labels = []
 	activation_function_list = ('Linear', 'Sigmoid', 'HardSigmoid', 'Step',
 								'Tanh', 'Relu', 'Softplus', 'Softmax', 'Elu', 'PRelu', 'LeakyRelu')
 
@@ -42,10 +42,11 @@ class Neural:
 		except ValueError:
 			return False
 
-	def read_file(self, path, sepa=','):
+	def read_file(self, path):
 		try:
-			self.df = pd.read_csv(path, sep=sepa, header=None, skipinitialspace=True)
+			self.df = pd.read_csv(path, header=None, skipinitialspace=True)
 			self.df.fillna(method='bfill', inplace=True)
+			self.df = shuffle(self.df)
 
 			for idx, data_column in enumerate(self.df):
 				contain_str = False  # TRUE - wszystkie kolumny beda  etykietami
@@ -97,7 +98,7 @@ class Neural:
 
 		# konwersja na klasy
 		self.output_data = self.convert_to_classes(self.output_data)
-		#self.input_data = self.normalize_data(self.input_data)
+		# self.input_data = self.normalize_data(self.input_data)
 
 		if verbose:
 			print("Dane wejściowe:\n" + str(self.input_data))
@@ -157,20 +158,48 @@ class Neural:
 			return False
 		return True
 
-	def select_algorithm(self, algorithm):
-		self.network = algorithms.LevenbergMarquardt(self.layers)
-		print("Wybrano optymalizator: " + str(algorithm))
+	def select_algorithm(self, algorithm, options=None):
+		try:
+			self.network = algorithms.LevenbergMarquardt(self.layers)
+			opt = options
+			print(opt[1])
+			print("Wybrano optymalizator: " + str(algorithm))
+		except RecursionError:
+			print("Problem rekursji")
+			return None
 
 		if algorithm == 'GradientDescent':
 			self.network = algorithms.GradientDescent(self.layers)
 		if algorithm == 'LevenbergMarquardt':
-			self.network = algorithms.LevenbergMarquardt(self.layers)
+			self.network = algorithms.LevenbergMarquardt(connection=self.layers, mu=opt[0], mu_update_factor=opt[1])
 		if algorithm == 'Adam':
 			self.network = algorithms.Adam(self.layers)
 		if algorithm == 'QuasiNewton':
 			self.network = algorithms.QuasiNewton(self.layers)
 		if algorithm == 'Quickprop':
 			self.network = algorithms.Quickprop(self.layers)
+		if algorithm == 'MinibatchGradientDescent':
+			self.network = algorithms.MinibatchGradientDescent(self.layers)
+		if algorithm == 'ConjugateGradient':
+			self.network = algorithms.ConjugateGradient(self.layers)
+		if algorithm == 'Hessian':
+			self.network = algorithms.Hessian(self.layers)
+		if algorithm == 'HessianDiagonal':
+			self.network = algorithms.HessianDiagonal(self.layers)
+		if algorithm == 'Momentum':
+			self.network = algorithms.Momentum(self.layers)
+		if algorithm == 'RPROP':
+			self.network = algorithms.RPROP(self.layers)
+		if algorithm == 'IRPROPPlus':
+			self.network = algorithms.IRPROPPlus(self.layers)
+		if algorithm == 'Adadelta':
+			self.network = algorithms.Adadelta(self.layers)
+		if algorithm == 'Adagrad':
+			self.network = algorithms.Adagrad(self.layers)
+		if algorithm == 'RMSProp':
+			self.network = algorithms.RMSProp(self.layers)
+		if algorithm == 'Adamax':
+			self.network = algorithms.Adamax(self.layers)
 
 	def decode_model(self, raw_model):
 		try:
@@ -190,7 +219,7 @@ class Neural:
 		except Exception:
 			return None
 
-	def model_network(self, algorithm='LevenbergMarquardt', model=None):
+	def model_network(self, algorithm='LevenbergMarquardt', model=None, opt=None):
 
 		model = self.decode_model(model)
 		if model is None:
@@ -229,7 +258,7 @@ class Neural:
 		print('Model warstw: ' + str(layer_model))
 
 		self.layers = layer_model
-		self.select_algorithm(algorithm)
+		self.select_algorithm(algorithm, options=opt)
 
 	def show_plow(self):
 		plots.error_plot(self.network)
@@ -238,29 +267,27 @@ class Neural:
 
 		if self.network is None:
 			print("Sieć nie została utworzona")
-			# raise ValueError("Sieć nie została utworzona")
+			raise ValueError("Sieć nie została utworzona")
 		self.network.verbose = verbose
 		self.network.shuffle_data = shuffle
 
 		if self.input_train is None or self.output_train is None:
 			print("Nie zainicjowano danych uczących")
-			# raise ValueError("Nie zainicjowano danych uczących")
+			raise ValueError("Nie zainicjowano danych uczących")
 		if validate:
 			if self.input_test is None or self.output_test is None:
 				print("Nie zainicjowano danych walidujących")
-				# raise ValueError("Nie zainicjowano danych walidujących")
-			self.network.train(self.input_train, self.output_train, self.input_test, self.output_test, epochs=epo)
-			# self.network.architecture()
+				raise ValueError("Nie zainicjowano danych walidujących")
+			try:
+				self.network.train(self.input_train, self.output_train, self.input_test, self.output_test, epochs=epo)
+			except Exception:
+				raise ValueError("Błąd w trakcie procesu uczenia!")
+			#self.network.architecture()
 		else:
 			self.network.train(self.input_train, self.output_train, epochs=epo)
 
 	def predict(self, data=None):
 		try:
-			if data is None:
-				if len(self.df.column) == 3:
-					data = np.array([[4.8, 3.1, 1.6]])  # 0.2, 1.0
-				else:
-					data = np.array([[4.8, 3.1, 1.6, 0.2]])  # 1.0
 			y_class = self.network.predict(data)
 			return y_class
 		except AttributeError:
